@@ -82,4 +82,17 @@ class ParallelParenthesesBalancingSuite extends FunSuite {
     check("((())((())))", true)
   }
 
+  test("zeros stress, par"){
+    val length = 1000
+    val chars = new Array[Char](length)
+    val threshold = 10
+    parBalance(chars, threshold)
+  }
+
+  test("zeros stress"){
+    val length = 1000
+    val chars = new Array[Char](length)
+    balance(chars)
+  }
+
 }

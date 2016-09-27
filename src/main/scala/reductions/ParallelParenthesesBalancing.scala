@@ -52,7 +52,6 @@ object ParallelParenthesesBalancing {
       case c if c.head == RightPar =>
         stack.nonEmpty && iterateBalance(c.tail, stack.dropRight(1))
       case c => iterateBalance(c.tail, stack)
-      case _ => throw new Exception(s"unpredicted case: $chars")
     }
   }
 
@@ -64,9 +63,10 @@ object ParallelParenthesesBalancing {
 
   case class Result(sum: Int, left: Int, right: Int)
 
+
   def recBalance(chars: Array[Char], threshold: Int): Result = {
     val res = chars.toList match {
-      case Nil => Result(0,0,0)
+      case _ if chars.isEmpty => Result(0,0,0)
       case list if list.size > threshold =>
         val (left, right) = chars.splitAt(chars.size / 2)
         val (rL, rR) = parallel(recBalance(left, threshold), recBalance(right, threshold))
@@ -79,7 +79,7 @@ object ParallelParenthesesBalancing {
         val firstLeft = parrOpt.map(x => if (x == RightPar) -1 else 1).getOrElse(0)
         Result(sum, firstLeft, sum)
     }
-    println(s"recBalance chars ${chars.toList}, Result:$res")
+    //println(s"recBalance chars ${chars.toList}, Result:$res")
     res
   }
 

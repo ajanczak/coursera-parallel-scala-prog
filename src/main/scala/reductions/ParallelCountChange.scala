@@ -14,7 +14,7 @@ object ParallelCountChangeRunner {
     Key.exec.maxWarmupRuns -> 40,
     Key.exec.benchRuns -> 80,
     Key.verbose -> true
-  ) withWarmer(new Warmer.Default)
+  ) withWarmer (new Warmer.Default)
 
   def main(args: Array[String]): Unit = {
     val amount = 250
@@ -40,20 +40,70 @@ object ParallelCountChangeRunner {
   }
 }
 
+sealed trait Tree
+
+case object Nil extends Tree
+
+case class Node[T](value: T, left: Tree = Nil, right: Tree = Nil) extends Tree {
+  override def toString() = {
+    s"\t[$value]" +
+      s"\n[${left}]\t\t[$right]"
+  }
+}
+
+case class Money(amount: Int, coins: List[Int])
+
+
 object ParallelCountChange {
 
+  private def buildChildren(m: Money) = {
+    val moneyCnt = m.amount - m.coins.head
+    val left =
+      if (moneyCnt <= 0) Node(Money(moneyCnt, m.coins))
+      else Nil
+    val right =
+      if (m.coins.size > 1) Node(Money(m.amount, m.coins.tail))
+      else Nil
+    val result = Node(m, left, right)
+    //println(s"buildChildren $result")
+    result
+  }
+
+  private def inspectTree(node: Tree, result: Int): Int = {
+    println(s"inspectTree:\n $node")
+    node match {
+      case Nil => 0
+      case Node(value: Money, left, right) =>
+        if (value.amount == 0) {
+          1
+        }
+        else {
+          val node = buildChildren(value)
+          val leftValue = inspectTree(node.left, result)
+          val rightValue = inspectTree(node.right, result)
+          leftValue + rightValue
+        }
+      case x => throw new Exception(s"Unmatched case: $x")
+    }
+  }
+
   /** Returns the number of ways change can be made from the specified list of
-   *  coins for the specified amount of money.
-   */
+    * coins for the specified amount of money.
+    */
   def countChange(money: Int, coins: List[Int]): Int = {
-    ???
+    if (money == 0) 1
+    else if (money > 0 && coins.nonEmpty) {
+      val root = buildChildren(Money(money, coins))
+      inspectTree(root, 0)
+    }
+    else 0
   }
 
   type Threshold = (Int, List[Int]) => Boolean
 
   /** In parallel, counts the number of ways change can be made from the
-   *  specified list of coins for the specified amount of money.
-   */
+    * specified list of coins for the specified amount of money.
+    */
   def parCountChange(money: Int, coins: List[Int], threshold: Threshold): Int = {
     ???
   }
