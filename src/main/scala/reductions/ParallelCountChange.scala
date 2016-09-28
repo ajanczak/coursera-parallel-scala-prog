@@ -58,7 +58,9 @@ object ParallelCountChange {
 
   case class Money(amount: Int, coins: List[Int])
 
-  type Threshold = (Money) => Boolean
+
+  type Threshold = (Int, List[Int]) => Boolean
+  type MyThreshold = Money => Boolean
 
   private def buildChildren(m: Money, level: Int = 0) = {
     val moneyCnt = m.amount - m.coins.head
@@ -117,7 +119,7 @@ object ParallelCountChange {
         }
         else {
           val nodeWithChildren = buildChildren(value, level)
-          val shouldParallel = moneyThreshold(1)(value)
+          val shouldParallel = myThreshold(1)(value)
           val (leftValue,rightValue) =
             if (shouldParallel)
               parallel(inspectTreePar(nodeWithChildren.left), inspectTreePar(nodeWithChildren.right))
@@ -145,14 +147,17 @@ object ParallelCountChange {
   }
 
   /** Threshold heuristic based on the starting money. */
-  def moneyThreshold(startingMoney: Int): Threshold =
+  def myThreshold(startingMoney: Int): MyThreshold =
     m => m match {
       case money if money.coins.size > 2 => true
       case money => false
     }
 
+  /** Threshold heuristic based on the starting money. */
+  def moneyThreshold(startingMoney: Int): Threshold =  (x,y) => true
+
   /** Threshold heuristic based on the total number of initial coins. */
-  def totalCoinsThreshold(totalCoins: Int): Threshold = (x) => true
+  def totalCoinsThreshold(totalCoins: Int): Threshold = (x,y) => true
 
 
   /** Threshold heuristic based on the starting money and the initial list of coins. */
