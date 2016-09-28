@@ -52,12 +52,11 @@ case class Node[T](value: T, left: Tree = Nil, right: Tree = Nil, level: Int = 0
   }
 }
 
-case class Money(amount: Int, coins: List[Int])
-
-
-
 
 object ParallelCountChange {
+
+
+  case class Money(amount: Int, coins: List[Int])
 
   type Threshold = (Money) => Boolean
 
