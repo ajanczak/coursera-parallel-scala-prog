@@ -59,7 +59,9 @@ object LineOfSight {
   /** Traverses the specified part of the array and returns the maximum angle.
    */
   def upsweepSequential(input: Array[Float], from: Int, until: Int): Float = {
-    ???
+    val angels = new Array[Float](input.length)
+    lineOfSight(input, angels)
+    angels.last
   }
 
   /** Traverses the part of the array starting at `from` and until `end`, and
@@ -80,8 +82,17 @@ object LineOfSight {
    *  given the `startingAngle`.
    */
   def downsweepSequential(input: Array[Float], output: Array[Float],
-    startingAngle: Float, from: Int, until: Int): Unit = {
-    ???
+                          startingAngle: Float, from: Int, untilP: Int): Unit = {
+    println(s"input: ${input.toList}")
+    lineOfSight(input, output)
+
+//    for (i <- from until untilP) {
+//      val r =
+//        if (startingAngle > input(i)) startingAngle
+//        else input(i)
+//      println(s"r: $r")
+//      output.update(i, r)
+//    }
   }
 
   /** Pushes the maximum angle in the prefix of the array to each leaf of the
