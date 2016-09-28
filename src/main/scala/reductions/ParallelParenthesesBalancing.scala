@@ -17,12 +17,12 @@ object ParallelParenthesesBalancingRunner {
     Key.exec.maxWarmupRuns -> 25,
     Key.exec.benchRuns -> 120,
     Key.verbose -> true
-  ) withWarmer(new Warmer.Default)
+  ) withWarmer (new Warmer.Default)
 
   def main(args: Array[String]): Unit = {
-    val length = 10000000
+    val length = 100000000
     val chars = new Array[Char](length)
-    val threshold = 100000
+    val threshold = 10000
     val seqtime = standardConfig measure {
       seqResult = ParallelParenthesesBalancing.balance(chars)
     }
@@ -43,54 +43,82 @@ object ParallelParenthesesBalancing {
   val LeftPar = '('
   val RightPar = ')'
 
-  @tailrec
-  private def iterateBalance(chars: List[Char], stack: List[Char]): Boolean = {
-    //println(s"Iteration: chars: ${chars.toString()}, stack: $stack")
-    chars match {
-      case c if c.isEmpty => stack.isEmpty
-      case c if c.head == LeftPar => iterateBalance(c.tail, (stack :+ c.head))
-      case c if c.head == RightPar =>
-        stack.nonEmpty && iterateBalance(c.tail, stack.dropRight(1))
-      case c => iterateBalance(c.tail, stack)
-    }
-  }
 
   /** Returns `true` iff the parentheses in the input `chars` are balanced.
-   */
+    */
   def balance(chars: Array[Char]): Boolean = {
-    iterateBalance(chars.toList, List())
+    //print(s"chars: ${chars.toList}")
+    var i = 0
+    var counter = 0
+    while (i < chars.length) {
+      if (chars(i) == LeftPar) counter += 1
+      else if (chars(i) == RightPar) counter -= 1
+      //println(s"counter: $counter")
+      i += 1
+      if (counter < 0) return false
+    }
+    if (counter == 0) true
+    else false
   }
 
   case class Result(sum: Int, left: Int, right: Int)
 
 
-  def recBalance(chars: Array[Char], threshold: Int): Result = {
-    val res = chars.toList match {
-      case _ if chars.isEmpty => Result(0,0,0)
-      case list if list.size > threshold =>
-        val (left, right) = chars.splitAt(chars.size / 2)
-        val (rL, rR) = parallel(recBalance(left, threshold), recBalance(right, threshold))
-        Result(rL.sum + rR.sum, rL.sum, rR.sum)
-      case _ =>
-        val openParRes = chars.filter(_ == LeftPar).size
-        val closeParRes = chars.filter(_ == RightPar).size
-        val sum  = openParRes - closeParRes
-        val parrOpt = chars.dropWhile(x => x != LeftPar && x != RightPar).headOption
-        val firstLeft = parrOpt.map(x => if (x == RightPar) -1 else 1).getOrElse(0)
-        Result(sum, firstLeft, sum)
+  /** Returns `true` iff the parentheses in the input `chars` are balanced.
+    */
+  def parBalance(chars: Array[Char], threshold: Int): Boolean = {
+
+    def recBalance(from: Int, to: Int): (Int, Int) = {
+
+      def balanceSeq(from: Int, to: Int): (Int, Int)  = {
+        //print(s"chars: ${chars.toList}")
+        var i = from
+        var counter = 0
+        var unbalancedClose = 0
+        while (i < to) {
+          if (chars(i) == LeftPar) counter += 1
+          else if (chars(i) == RightPar) counter -= 1
+          //println(s"counter: $counter")
+          i += 1
+          //          if (counter < 0) {
+          //            unbalancedClose += 1
+          //            println(s"adding unbalance, unbalancedClose: $unbalancedClose")
+          //          }
+        }
+        if (counter < 0) {
+          unbalancedClose += 1
+        }
+        //println(s"---balanceSeq: ${(counter,unbalancedClose)}")
+        (counter,unbalancedClose)
+      }
+
+      if (to < from) throw new Exception("eee")
+
+      val howMany = to - from
+      val res = if (howMany > threshold) {
+        val chunkSize = (to - from) / 2
+        //println(s"Starting recursion for threshold:$threshold [${chars.toList}],\nhowMany:$howMany\nchunk: $chunkSize\n LEFT: [$from - ${from+chunkSize}]\n RIGHT: [${from+chunkSize} - $to]")
+        //readLine()
+        val (leftSide, rightSide) = parallel(recBalance(from, from+chunkSize), recBalance(from+chunkSize, to))
+        //if (leftSide._2 > 0 ) println(s"------ !!! Unbalanced LEFT: ${leftSide._2}")
+        //if (rightSide._2 > 0 ) println(s"------ !!! Unbalanced RIGHT: ${rightSide._2}")
+        (leftSide._1 + rightSide._1, leftSide._2)
+
+        //Result(rL.sum + rR.sum, rL.sum, rR.sum)
+      }
+      else {
+        balanceSeq(from, to)
+      }
+      //println(s"recBalance chars ${chars.toList}, Result:$res")
+      res
     }
-    //println(s"recBalance chars ${chars.toList}, Result:$res")
-    res
+
+    val (sum, unbalanced) = recBalance(0, chars.size)
+    if (sum == 0 && unbalanced <= 0) true
+    else false
+
   }
 
-  /** Returns `true` iff the parentheses in the input `chars` are balanced.
-   */
-  def parBalance(chars: Array[Char], threshold: Int): Boolean = {
-    val result = recBalance(chars, threshold)
-    if (result.left < 0) false
-    else if (result.sum != 0) false
-    else true
-  }
 
   // For those who want more:
   // Prove that your reduction operator is associative!

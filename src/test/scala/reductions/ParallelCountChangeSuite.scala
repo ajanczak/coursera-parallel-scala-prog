@@ -63,5 +63,4 @@ class ParallelCountChangeSuite extends FunSuite {
     check(250, List(1, 2, 5, 10, 20, 50), 177863)
   }
 
-
 }
