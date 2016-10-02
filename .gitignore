@@ -1,8 +1,0 @@
-.idea
-*.iml
-.tmp
-build
-node_modules
-bower_components
-dist
-my_docker.sh
