@@ -1,6 +1,8 @@
 import common._
 import barneshut.conctrees._
 
+import scala.annotation.tailrec
+
 package object barneshut {
 
   class Boundaries {
@@ -36,42 +38,98 @@ package object barneshut {
 
     def centerY: Float
 
+    //size is the length of the side of the cell,
     def size: Float
 
+    //total number of bodies in the cell.
     def total: Int
 
     def insert(b: Body): Quad
+
+    def isInside(body: Body): Boolean = {
+      (centerX - size / 2) >= body.x && body.x <= (centerX + size / 2) && (centerY - size / 2) >= body.y && body.y <= (centerY + size / 2)
+    }
+
   }
 
   case class Empty(centerX: Float, centerY: Float, size: Float) extends Quad {
-    def massX: Float = ???
-    def massY: Float = ???
-    def mass: Float = ???
-    def total: Int = ???
-    def insert(b: Body): Quad = ???
+    val massX: Float = centerX
+    val massY: Float = centerY
+    val mass: Float = 0f
+    val total: Int = 0
+
+    def insert(b: Body): Quad = {
+      Leaf(centerX, centerY, size, Seq(b))
+    }
   }
 
   case class Fork(
     nw: Quad, ne: Quad, sw: Quad, se: Quad
   ) extends Quad {
-    val centerX: Float = ???
-    val centerY: Float = ???
-    val size: Float = ???
-    val mass: Float = ???
-    val massX: Float = ???
-    val massY: Float = ???
-    val total: Int = ???
+    val list = List(nw, ne, sw, se)
+    val halfSize = (nw.size / 2)
+    val centerX: Float = nw.centerX + halfSize
+    val centerY: Float = nw.centerY + halfSize
+    val size: Float = nw.size * 2
+    val mass: Float = nw.mass + ne.mass + sw.mass + se.mass
+    val total: Int = nw.total + ne.total + sw.total + se.total
+    val massX: Float =
+      if (total == 0) centerX
+      else list.map(r => r.massX * r.centerX).sum / mass
+    val massY: Float =
+      if (total == 0) centerY
+      else list.map(r => r.massY * r.centerY).sum / mass
 
     def insert(b: Body): Fork = {
-      ???
+      val node = list.collectFirst {
+        case nodee if nodee.isInside(b) => nodee
+      }.getOrElse(throw new Exception(s"Body $b Not inside $this"))
+      node match {
+        case e: Empty =>
+          val newLeaf = e.insert(b)
+          updateWithQuad(newLeaf, b)
+        case f: Fork =>
+          val updatedQuad = f.insert(b)
+          updateWithQuad(updatedQuad, b)
+        case l: Leaf =>
+          updateWithQuad(l.insert(b), b)
+      }
+    }
+
+    def updateWithQuad(q: Quad, b: Body): Fork = {
+      b match {
+        case _ if nw.isInside(b) => this.copy(nw = q)
+        case _ if ne.isInside(b) => this.copy(ne = q)
+        case _ if sw.isInside(b) => this.copy(sw = q)
+        case _ if se.isInside(b) => this.copy(se = q)
+      }
     }
   }
 
   case class Leaf(centerX: Float, centerY: Float, size: Float, bodies: Seq[Body])
-  extends Quad {
-    val (mass, massX, massY) = (??? : Float, ??? : Float, ??? : Float)
-    val total: Int = ???
-    def insert(b: Body): Quad = ???
+    extends Quad {
+    val mass = bodies.map(_.mass).sum
+    val massX = bodies.map(body => body.mass * body.x).sum / mass
+    val massY = bodies.map(body => body.mass * body.y).sum / mass
+    val total: Int = bodies.size
+
+    def insert(b: Body): Quad = {
+      if (total < minimumSize) {
+        this.copy(bodies = bodies.+:(b))
+      }
+      else {
+        val bodiesss = bodies.+:(b)
+        val sizeBy4 = (size / 4)
+        val sizeBy2 = (size / 2)
+        val ne = Empty(centerX - sizeBy4, centerY - sizeBy4, sizeBy2)
+        val nw = Empty(centerX + sizeBy4, centerY - sizeBy4, sizeBy2)
+        val se = Empty(centerX - sizeBy4, centerY + sizeBy4, sizeBy2)
+        val sw = Empty(centerX + sizeBy4, centerY + sizeBy4, sizeBy2)
+        bodiesss.foldLeft(Fork.apply(nw, ne, sw, se)) {
+          case (quad, b) => quad.insert(b)
+        }
+      }
+    }
   }
 
   def minimumSize = 0.00001f
@@ -120,12 +178,14 @@ package object barneshut {
 
       def traverse(quad: Quad): Unit = (quad: Quad) match {
         case Empty(_, _, _) =>
-          // no force
+        // no force
         case Leaf(_, _, _, bodies) =>
-          // add force contribution of each body by calling addForce
-        case Fork(nw, ne, sw, se) =>
-          // see if node is far enough from the body,
-          // or recursion is needed
+          bodies.foreach { case b: Body => addForce(b.mass, b.x, b.y) }
+        case f@Fork(nw, ne, sw, se) =>
+          f.list.foreach { case q =>
+            if (q.size / distance(q.centerX, q.centerY, x, y) < theta) addForce(q.mass, q.centerX, q.centerY)
+            else traverse(q)
+          }
       }
 
       traverse(quad)
@@ -166,7 +226,7 @@ package object barneshut {
           val centerX = boundaries.minX + x * sectorSize + sectorSize / 2
           val centerY = boundaries.minY + y * sectorSize + sectorSize / 2
           var emptyQuad: Quad = Empty(centerX, centerY, sectorSize)
-          val sectorBodies = this(x, y)
+          val sectorBodies = this (x, y)
           sectorBodies.foldLeft(emptyQuad)(_ insert _)
         } else {
           val nspan = span / 2
@@ -177,12 +237,13 @@ package object barneshut {
               quad(x + nspan, y, nspan, nAchievedParallelism),
               quad(x, y + nspan, nspan, nAchievedParallelism),
               quad(x + nspan, y + nspan, nspan, nAchievedParallelism)
-            ) else (
+            )
+            else (
               quad(x, y, nspan, nAchievedParallelism),
               quad(x + nspan, y, nspan, nAchievedParallelism),
               quad(x, y + nspan, nspan, nAchievedParallelism),
               quad(x + nspan, y + nspan, nspan, nAchievedParallelism)
-            )
+              )
           Fork(nw, ne, sw, se)
         }
       }
@@ -198,7 +259,7 @@ package object barneshut {
 
     def clear() = timeMap.clear()
 
-    def timed[T](title: String)(body: =>T): T = {
+    def timed[T](title: String)(body: => T): T = {
       var res: T = null.asInstanceOf[T]
       val totalTime = /*measure*/ {
         val startTime = System.currentTimeMillis()
@@ -218,7 +279,8 @@ package object barneshut {
     override def toString = {
       timeMap map {
         case (k, (total, num)) => k + ": " + (total / num * 100).toInt / 100.0 + " ms"
-      } mkString("\n")
+      } mkString ("\n")
     }
   }
+
 }
